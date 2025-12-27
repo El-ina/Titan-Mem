@@ -1,0 +1,26 @@
+# General Settings for Titan Memory
+
+# Directories
+output_dir: out
+sessions_dir: out/sessions
+
+# File names
+memories_file: memories.json
+artifacts_file: artifacts.json
+graph_file: graph.html
+
+# Knowledge Graph Settings
+similarity_top_k: 2
+similarity_min_threshold: 0.35
+
+# Chat Settings
+chat_backend: ollama
+
+# Memory Extraction Settings
+extraction_backend: ollama
+min_memory_length: 6
+max_fallback_sentences: 3
+
+# Server Settings
+host: 127.0.0.1
+port: 8000

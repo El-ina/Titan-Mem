@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Titan Memory</title>
+    <style>
+      :root {
+        --bg-1: #0b0f1a;
+        --bg-2: #0f1b2e;
+        --panel: rgba(12, 18, 30, 0.88);
+        --border: #1d2a3b;
+        --accent: #4dd0b6;
+        --accent-2: #7aa2ff;
+        --text: #eef7f6;
+        --muted: #9fb1b0;
+        --user: rgba(77, 208, 182, 0.18);
+        --assistant: rgba(122, 162, 255, 0.16);
+        --shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          radial-gradient(1200px 800px at 20% -10%, rgba(77, 208, 182, 0.18), transparent 60%),
+          radial-gradient(1000px 700px at 90% 10%, rgba(122, 162, 255, 0.16), transparent 55%),
+          linear-gradient(160deg, var(--bg-1), var(--bg-2));
+        font-family: "Avenir Next", "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+        letter-spacing: 0.2px;
+      }
+      .shell {
+        display: flex;
+        min-height: 100vh;
+      }
+      .chat {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 32px 28px 24px 28px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding-bottom: 8px;
+      }
+      .brand {
+        font-size: 18px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .subtle {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .messages {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 8px 6px 16px 6px;
+        overflow-y: auto;
+      }
+      .message {
+        max-width: 72ch;
+        padding: 12px 16px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        animation: rise 0.2s ease-out;
+        line-height: 1.5;
+        font-size: 15px;
+      }
+      .message.user {
+        align-self: flex-end;
+        background: var(--user);
+        border-color: rgba(77, 208, 182, 0.35);
+      }
+      .message.assistant {
+        align-self: flex-start;
+        background: var(--assistant);
+        border-color: rgba(122, 162, 255, 0.35);
+      }
+      .message.typing {
+        color: var(--muted);
+        font-style: italic;
+      }
+      .composer {
+        display: flex;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(10, 15, 28, 0.8);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+      .composer textarea {
+        flex: 1;
+        resize: none;
+        border: none;
+        outline: none;
+        background: transparent;
+        color: var(--text);
+        font-size: 15px;
+        min-height: 48px;
+        font-family: inherit;
+      }
+      .composer button {
+        border: none;
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        color: #08131a;
+        font-weight: 600;
+        padding: 12px 18px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      .composer button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(77, 208, 182, 0.2);
+      }
+      .memory {
+        width: 320px;
+        border-left: 1px solid var(--border);
+        background: rgba(8, 12, 24, 0.9);
+        padding: 28px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .memory.hidden {
+        display: none;
+      }
+      .memory-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .memory-title {
+        font-size: 14px;
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+        color: var(--accent-2);
+      }
+      .memory-status {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .memory-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .memory-item {
+        border-left: 2px solid rgba(122, 162, 255, 0.4);
+        padding-left: 10px;
+        font-size: 13px;
+        line-height: 1.4;
+        color: #d7e3e2;
+      }
+      .memory-footer {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .ghost {
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text);
+        padding: 6px 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      a.link {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a.link:hover {
+        text-decoration: underline;
+      }
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @media (max-width: 900px) {
+        .shell { flex-direction: column; }
+        .memory { width: 100%; border-left: none; border-top: 1px solid var(--border); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="chat">
+        <header>
+          <div>
+            <div class="brand">Titan Memory</div>
+            <div class="subtle">Local-first chat + atomic memory</div>
+          </div>
+          <button class="ghost" id="toggleMemory">Memory</button>
+        </header>
+        <div class="messages" id="messages"></div>
+        <form class="composer" id="composer">
+          <textarea id="input" placeholder="Say what matters..."></textarea>
+          <button type="submit" id="send">Send</button>
+        </form>
+      </section>
+      <aside class="memory hidden" id="memoryPane">
+        <div class="memory-header">
+          <div class="memory-title">Recent Memories</div>
+          <div class="memory-status" id="memoryStatus">idle</div>
+        </div>
+        <div class="memory-list" id="memoryList"></div>
+        <div class="memory-footer">
+          <span id="memoryCount">0</span>
+          <a class="link" href="/graph" target="_blank">Open graph</a>
+        </div>
+      </aside>
+    </div>
+    <script>
+      const messagesEl = document.getElementById("messages");
+      const inputEl = document.getElementById("input");
+      const composerEl = document.getElementById("composer");
+      const toggleMemoryEl = document.getElementById("toggleMemory");
+      const memoryPaneEl = document.getElementById("memoryPane");
+      const memoryListEl = document.getElementById("memoryList");
+      const memoryStatusEl = document.getElementById("memoryStatus");
+      const memoryCountEl = document.getElementById("memoryCount");
+
+      let sessionId = localStorage.getItem("titan_session_id");
+      let memoryCount = 0;
+
+      function scrollToBottom() {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function addMessage(role, text, typing = false) {
+        const el = document.createElement("div");
+        el.className = `message ${role}`;
+        if (typing) el.classList.add("typing");
+        el.textContent = text;
+        messagesEl.appendChild(el);
+        scrollToBottom();
+        return el;
+      }
+
+      async function ensureSession() {
+        if (sessionId) return sessionId;
+        const res = await fetch("/api/session");
+        const data = await res.json();
+        sessionId = data.session_id;
+        localStorage.setItem("titan_session_id", sessionId);
+        return sessionId;
+      }
+
+      async function loadHistory() {
+        if (!sessionId) return;
+        const res = await fetch(`/api/history?session_id=${sessionId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        messagesEl.innerHTML = "";
+        data.messages.forEach((msg) => addMessage(msg.role, msg.content));
+      }
+
+      async function refreshMemories() {
+        if (!sessionId) return;
+        const res = await fetch(`/api/memories?session_id=${sessionId}&limit=6`);
+        if (!res.ok) return;
+        const data = await res.json();
+        memoryListEl.innerHTML = "";
+        data.memories.forEach((mem) => {
+          const item = document.createElement("div");
+          item.className = "memory-item";
+          item.textContent = mem.text;
+          memoryListEl.appendChild(item);
+        });
+        memoryCountEl.textContent = data.count.toString();
+        if (data.count > memoryCount) {
+          memoryStatusEl.textContent = "updated";
+        } else {
+          memoryStatusEl.textContent = "idle";
+        }
+        memoryCount = data.count;
+      }
+
+      async function sendMessage(text) {
+        await ensureSession();
+        addMessage("user", text);
+        const typingEl = addMessage("assistant", "Thinking...", true);
+        inputEl.value = "";
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, message: text })
+        });
+        const data = await res.json();
+        typingEl.remove();
+        addMessage("assistant", data.assistant);
+        setTimeout(refreshMemories, 800);
+      }
+
+      composerEl.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const text = inputEl.value.trim();
+        if (!text) return;
+        inputEl.focus();
+        await sendMessage(text);
+      });
+
+      toggleMemoryEl.addEventListener("click", () => {
+        memoryPaneEl.classList.toggle("hidden");
+      });
+
+      inputEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          composerEl.requestSubmit();
+        }
+      });
+
+      (async function init() {
+        await ensureSession();
+        await loadHistory();
+        await refreshMemories();
+      })();
+    </script>
+  </body>
+</html>

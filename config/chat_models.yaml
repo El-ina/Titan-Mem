@@ -1,0 +1,21 @@
+# Chat Models Configuration
+# Change 'current' to switch between backends
+
+current: ollama
+
+ollama:
+  enabled: true
+  base_url: http://localhost:11434
+  model: llama3.1:8b
+
+openrouter:
+  enabled: false
+  api_key: YOUR_OPENROUTER_API_KEY_HERE
+  base_url: https://openrouter.ai/api/v1
+  model: anthropic/claude-3.5-sonnet
+
+openai:
+  enabled: false
+  api_key: YOUR_OPENAI_API_KEY_HERE
+  base_url: https://api.openai.com/v1
+  model: gpt-4o

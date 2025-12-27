@@ -1,0 +1,23 @@
+# Generated artifacts
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+server.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files (optional - keeping locally but not on GitHub)
+# *_old.py
