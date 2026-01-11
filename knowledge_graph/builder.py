@@ -60,6 +60,7 @@ def build_graph(sim_top_k: int = 2, sim_min: float = 0.35) -> None:
         graph.add_edge(all_memories[a]["id"], all_memories[b]["id"], weight=w, kind="similarity")
 
     net = Network(height="700px", width="100%", directed=False)
+    net.show_buttons(filter_=["physics"])
     net.from_nx(graph)
 
     for edge in net.edges:
@@ -68,7 +69,17 @@ def build_graph(sim_top_k: int = 2, sim_min: float = 0.35) -> None:
             edge["value"] = max(1.0, 10.0 * float(edge.get("weight", 0)))
 
     html = net.generate_html()
-    GRAPH_FILE.write_text(html, encoding="utf-8")
+    
+    lines = html.split('\n')
+    new_lines = []
+    for line in lines:
+        if '"enabled": false' in line:
+            new_lines.append(line.replace('false', 'true'))
+            new_lines.append('        "filter": ["physics"],')
+        else:
+            new_lines.append(line)
+    
+    GRAPH_FILE.write_text('\n'.join(new_lines), encoding="utf-8")
 
     artifacts = {
         "model": "auto",
