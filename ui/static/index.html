@@ -171,6 +171,22 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .danger-btn {
+        border: 1px solid rgba(255, 100, 100, 0.4);
+        background: rgba(255, 100, 100, 0.1);
+        color: #ff8585;
+        padding: 6px 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .danger-btn:hover {
+        background: rgba(255, 100, 100, 0.2);
+        transform: translateY(-1px);
       }
       .ghost {
         border: 1px solid var(--border);
@@ -222,6 +238,7 @@
         <div class="memory-list" id="memoryList"></div>
         <div class="memory-footer">
           <span id="memoryCount">0</span>
+          <button class="danger-btn" id="clearMemories">Clear All</button>
           <a class="link" href="/graph" target="_blank">Open graph</a>
         </div>
       </aside>
@@ -318,6 +335,18 @@
 
       toggleMemoryEl.addEventListener("click", () => {
         memoryPaneEl.classList.toggle("hidden");
+      });
+
+      document.getElementById("clearMemories").addEventListener("click", async () => {
+        if (!confirm("Are you sure you want to clear all memories? This cannot be undone.")) {
+          return;
+        }
+        const res = await fetch("/api/clear-memories", {
+          method: "POST"
+        });
+        if (res.ok) {
+          await refreshMemories();
+        }
       });
 
       inputEl.addEventListener("keydown", (event) => {

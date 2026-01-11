@@ -14,6 +14,7 @@ from storage.memories import (
     create_memory_record,
     load_all_memories,
     save_all_memories,
+    clear_all_memories,
 )
 from knowledge_graph.builder import build_graph
 from storage.sessions import OUT_DIR
@@ -102,3 +103,11 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> dict:
         "assistant": assistant_text,
         "memory_status": "queued",
     }
+
+
+@router.post("/api/clear-memories")
+def clear_memories_route() -> dict:
+    ensure_dirs()
+    clear_all_memories()
+    build_graph()
+    return {"status": "cleared"}

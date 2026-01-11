@@ -69,3 +69,7 @@ def get_memory_count(session_id: Optional[str] = None) -> int:
     if session_id:
         all_memories = [mem for mem in all_memories if mem.get("session_id") == session_id]
     return len(all_memories)
+
+
+def clear_all_memories() -> None:
+    save_all_memories([])

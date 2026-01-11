@@ -27,6 +27,31 @@ def build_graph(sim_top_k: int = 2, sim_min: float = 0.35) -> None:
     all_memories = load_memories()
 
     if not all_memories:
+        net = Network(height="700px", width="100%", directed=False)
+        net.show_buttons(filter_=["physics"])
+
+        html = net.generate_html()
+
+        lines = html.split('\n')
+        new_lines = []
+        for line in lines:
+            if '"enabled": false' in line:
+                new_lines.append(line.replace('false', 'true'))
+                new_lines.append('        "filter": ["physics"],')
+            else:
+                new_lines.append(line)
+
+        GRAPH_FILE.write_text('\n'.join(new_lines), encoding="utf-8")
+
+        artifacts = {
+            "model": "auto",
+            "facts": [],
+            "embedding_dim": 0,
+            "memory_count": 0,
+        }
+
+        with open(ARTIFACTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(artifacts, f, indent=2)
         return
 
     facts = [m["text"] for m in all_memories]
@@ -69,7 +94,7 @@ def build_graph(sim_top_k: int = 2, sim_min: float = 0.35) -> None:
             edge["value"] = max(1.0, 10.0 * float(edge.get("weight", 0)))
 
     html = net.generate_html()
-    
+
     lines = html.split('\n')
     new_lines = []
     for line in lines:
@@ -78,7 +103,7 @@ def build_graph(sim_top_k: int = 2, sim_min: float = 0.35) -> None:
             new_lines.append('        "filter": ["physics"],')
         else:
             new_lines.append(line)
-    
+
     GRAPH_FILE.write_text('\n'.join(new_lines), encoding="utf-8")
 
     artifacts = {
