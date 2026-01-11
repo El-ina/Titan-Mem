@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+numpy
+pyyaml
+networkx
+pyvis
+requests
