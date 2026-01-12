@@ -10,44 +10,7 @@ from networkx.algorithms.community import greedy_modularity_communities
 OLLAMA_BASE_URL = "http://localhost:11434"
 MODEL = "nomic-embed-text:v1.5"
 
-HARDCODED_FACTS = [
-    "User wants a local tool that converts past AI conversations into structured memory.",
-    "Pipeline will extract atomic facts, embed them, and build a knowledge graph.",
-    "For MVP, skip extraction and test embeddings + graphing with hardcoded facts.",
-    "Embeddings are produced by a local model and used for semantic similarity.",
-    "Graph edges connect facts that are close in embedding space.",
-    "Later, plug in an LLM fact extractor to make it end-to-end.",
-    "The user is attempting to understand intelligence not just as computation, but as something that requires historical context to produce meaning.",
-    "The user distinguishes between raw language model training data and personally meaningful data curated through intentional reflection.",
-    "The user believes that meaning emerges when information is connected to a coherent past rather than treated as isolated tokens.",
-    "The user is exploring whether next-token prediction in LLMs has an analogue in predicting future human actions or life events.",
-    "The user conceptualizes personal atomic memories as an event stream that could be modeled similarly to language sequences.",
-    "The user is motivated by the idea that structured memory could enable probabilistic prediction of future decisions or phases.",
-    "The user is aware that without an explicit prediction objective, embeddings and graphs remain descriptive rather than generative.",
-    "The user is drawn to the idea of an AI system that maintains continuity instead of resetting context every interaction.",
-    "The user experiences discomfort with AI systems that feel intelligent but lack long-term memory or personal consistency.",
-    "The user frames long-term memory as a prerequisite for agency, identity, and sustained reasoning.",
-    "The user fears uncontrolled context injection and is concerned about overwhelming an AI with irrelevant personal history.",
-    "The user intuitively understands that selective recall, not total recall, is necessary for usable intelligence.",
-    "The user is reassured by the idea that memory retrieval can be constrained, compressed, and audited.",
-    "The user values systems that expose which memories influenced a response, rather than opaque personalization.",
-    "The user believes that long-term memory must be editable, versioned, and deletable to remain psychologically safe.",
-    "The user sees a personal memory system as a way to reduce repeated self-contradiction and decision fatigue.",
-    "The user expects that persistent memory would increase decision integrity across time.",
-    "The user believes that most people repeatedly relearn the same lessons due to lack of continuity, not lack of intelligence.",
-    "The user sees cumulative learning as a major leverage point that current tools fail to preserve.",
-    "The user anticipates that structured memory could interrupt negative behavioral or cognitive loops early.",
-    "The user believes that personal patterns are more valuable to surface than generic advice.",
-    "The user understands that embeddings approximate semantic similarity but do not encode causal or temporal truth.",
-    "The user recognizes that embeddings alone cannot reliably distinguish updates, contradictions, or negations.",
-    "The user accepts that a reasoning layer is required to interpret relationships between memories correctly.",
-    "The user conceptualizes LLMs as general intelligence operating systems rather than identity-bearing entities.",
-    "The user imagines a future where personal memory layers act as an identity module attached to general AI models.",
-    "The user is inspired by fictional examples but understands the real risks of misaligned memory systems.",
-    "The user believes that memory quality directly determines whether an AI amplifies wisdom or personal dysfunction.",
-    "The user sees their project as building a controllable second brain rather than an autonomous personality.",
-    "The user is motivated by the long-term compounding effects of continuity, self-knowledge, and reduced cognitive leakage.",
-]
+
 
 # -------- Embedding + similarity --------
 
@@ -97,6 +60,15 @@ def build_similarity_edges(vectors, top_k=3, min_sim=0.35):
         best[(a, b)] = max(best.get((a, b), 0.0), w)
     return [(a, b, w) for (a, b), w in best.items()]
 
+# -------- Load memories --------
+
+def load_memories():
+    mem_file = Path("out/memories.json")
+    if not mem_file.exists():
+        return []
+    with open(mem_file, "r", encoding="utf-8") as f:
+        return json.load(f)
+
 # -------- Visual style helpers --------
 
 PALETTE = [
@@ -120,7 +92,14 @@ def main():
     out_dir = Path("out")
     out_dir.mkdir(exist_ok=True)
 
-    vectors = ollama_embed(HARDCODED_FACTS)
+    memories = load_memories()
+    
+    if not memories:
+        print("No memories found in out/memories.json")
+        return
+
+    facts = [m["text"] for m in memories]
+    vectors = ollama_embed(facts)
     emb_dim = int(vectors[0].shape[0])
 
     # Similarity edges between facts
@@ -130,22 +109,31 @@ def main():
 
     # Build a simple graph object for community + degrees
     G = nx.Graph()
-    doc_id = "doc:hardcoded"
-    G.add_node(doc_id, kind="document", title="Hardcoded Facts")
+
+    # Group memories by session
+    session_docs = {}
+    for mem in memories:
+        sid = mem["session_id"]
+        doc_id = session_docs.get(sid)
+        if not doc_id:
+            doc_id = f"doc:{sid}"
+            session_docs[sid] = doc_id
+            label = f"S {sid[:6]}"
+            G.add_node(doc_id, label=label, title=f"Session {sid}", kind="document")
 
     fact_ids = []
-    for i, fact in enumerate(HARDCODED_FACTS):
-        nid = f"fact:{i}"
+    for i, mem in enumerate(memories):
+        nid = mem["id"]
         fact_ids.append(nid)
-        G.add_node(nid, kind="fact", title=fact)
+        G.add_node(nid, kind="memory", title=mem["text"])
 
-        # provenance edge (doc -> fact)
-        G.add_edge(doc_id, nid, kind="source", weight=1.0)
+        # Connect memory to its session
+        G.add_edge(session_docs[mem["session_id"]], nid, kind="source", weight=1.0)
 
     for a, b, w in sim_edges:
-        G.add_edge(f"fact:{a}", f"fact:{b}", kind="similarity", weight=float(w))
+        G.add_edge(memories[a]["id"], memories[b]["id"], kind="similarity", weight=float(w))
 
-    # Community detection on the fact-only subgraph (for cluster colors)
+    # Community detection on the memory-only subgraph (for cluster colors)
     fact_sub = G.subgraph(fact_ids).copy()
     communities = list(greedy_modularity_communities(fact_sub)) if fact_sub.number_of_edges() else []
     node_to_group = {}
@@ -157,38 +145,44 @@ def main():
     net = Network(
         height="800px",
         width="100%",
-        bgcolor="#000000",
-        font_color="#ffffff",
+        bgcolor="#0a0a0a",
         directed=False,
         cdn_resources="in_line",
     )
 
-    # Add document node (input layer)
-    net.add_node(
-        doc_id,
-        label="SOURCE",
-        title="Source: hardcoded test set",
-        size=5,
-        color="#ffff00",
-    )
+    # Add document nodes (sessions)
+    for sid, doc_id in session_docs.items():
+        label = f"S {sid[:6]}"
+        net.add_node(
+            doc_id,
+            label=label,
+            title=f"Session {sid}",
+            size=20,
+            color="#2d3748",
+        )
 
-    # Add fact nodes (small dots, labels hidden, text on hover/click)
+    # Add memory nodes (colored by community/knowledge area)
     degrees = dict(fact_sub.degree()) if fact_sub.number_of_nodes() else {}
     max_deg = max(degrees.values()) if degrees else 1
 
     for nid in fact_ids:
         deg = degrees.get(nid, 0)
-        size = 3 + (3 * (deg / max_deg))  # much smaller dots (3-6 range)
+        size = 8 + (12 * (deg / max_deg))  # larger nodes (8-20 range)
+        
+        # Color by community/knowledge area
+        group_idx = node_to_group.get(nid, 0) % len(PALETTE)
+        node_color = PALETTE[group_idx]
 
         net.add_node(
             nid,
             label="",  # clean look
             title=G.nodes[nid]["title"],
             size=size,
-            color="#ffff00",
+            color=node_color,
+            group=group_idx,
         )
 
-    # Add edges: clean straight lines
+    # Add edges: polished with thickness based on similarity strength
     for u, v, data in G.edges(data=True):
         kind = data.get("kind")
         w = float(data.get("weight", 0.0))
@@ -196,55 +190,85 @@ def main():
         if kind == "source":
             net.add_edge(
                 u, v,
-                width=0.5,
-                color="#444444",
-                title="provenance",
-                smooth=False,
+                width=1,
+                color="#4a5568",
+                title="source",
+                smooth=True,
             )
         else:
-            # map similarity to thickness (thinner edges)
+            # map similarity to thickness (thicker for stronger connections)
             if w_max > w_min:
                 t = (w - w_min) / (w_max - w_min)
             else:
                 t = 0.5
 
-            width = 0.5 + 1.5 * t  # 0.5-2.0 range
-            brightness = int(80 + 100 * t)  # 80-180 range
-            color = f"#{brightness:02x}{brightness:02x}{brightness+20:02x}"
+            width = 1.0 + 4.0 * t  # 1.0-5.0 range for visible thickness
+            
+            # Color gradient from light blue to dark blue based on strength
+            base = 100 + 155 * t
+            color = f"#{int(base):02x}{int(base):02x}ff"
+            hover_color = f"#{int(base+30):02x}{int(base+30):02x}ff"
 
             net.add_edge(
                 u, v,
                 width=width,
-                color=color,
-                title=f"cosine_sim={w:.3f}",
-                smooth=False,
+                color={
+                    "color": color,
+                    "hover": hover_color,
+                    "highlight": hover_color
+                },
+                title=f"similarity: {w:.3f}",
+                smooth=True,
             )
 
-    # Knowledge graph style options
+    # Knowledge graph style options - polished diagram look
     options = {
       "layout": {
-        "improvedLayout": True
+        "improvedLayout": True,
+        "hierarchical": {
+          "enabled": False,
+          "sortMethod": "hubsize"
+        }
       },
 
       "interaction": {
         "hover": True,
         "tooltipDelay": 20,
         "navigationButtons": True,
-        "keyboard": True
+        "keyboard": True,
+        "multiselect": False,
+        "hoverConnectedEdges": True
       },
 
       "nodes": {
-        "shape": "dot",
-        "borderWidth": 0,
-        "font": { "size": 10, "color": "#ffffff" },
-        "shadow": { "enabled": False }
+        "shape": "circle",
+        "borderWidth": 2,
+        "borderWidthSelected": 3,
+        "font": { 
+            "size": 14, 
+            "color": "#ffffff",
+            "face": "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+            "strokeWidth": 2,
+            "strokeColor": "#000000"
+        },
+        "shadow": {
+            "enabled": True,
+            "color": "rgba(0,0,0,0.3)",
+            "size": 5,
+            "x": 2,
+            "y": 2
+        }
       },
 
       "edges": {
-        "smooth": { "enabled": False },
+        "smooth": { 
+            "enabled": True,
+            "type": "continuous",
+            "roundness": 0.5
+        },
         "shadow": { "enabled": False },
-        "selectionWidth": 2,
-        "hoverWidth": 1
+        "selectionWidth": 3,
+        "hoverWidth": 2
       },
 
       "physics": {
@@ -271,77 +295,154 @@ def main():
     sim_count = len(sim_edges)
     total_edges = G.number_of_edges()
 
+    # Generate community color legend
+    legend_items = ""
+    for i, color in enumerate(PALETTE):
+        legend_items += f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0;"><div style="width:16px;height:16px;background:{color};border-radius:50%;"></div><span style="font-size:11px;color:#a0aec0;">Knowledge Area {i+1}</span></div>'
+
+    # Edge strength legend
+    edge_legend = """
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <div style="width:16px;height:2px;background:#6464ff;"></div>
+      <span style="font-size:11px;color:#a0aec0;">Weak</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <div style="width:16px;height:4px;background:#6464ff;"></div>
+      <span style="font-size:11px;color:#a0aec0;">Medium</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <div style="width:16px;height:6px;background:#6464ff;"></div>
+      <span style="font-size:11px;color:#a0aec0;">Strong</span>
+    </div>
+    """
+
     hud = f"""
     <style>
       html, body {{
         margin: 0;
         height: 100%;
-        background: #000000;
+        background: #0a0a0a;
         color: #ffffff;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       }}
       #mynetwork {{
-        background: #000000 !important;
+        background: #0a0a0a !important;
       }}
       .hud {{
         position: fixed;
         top: 20px;
         right: 20px;
-        background: rgba(0, 0, 0, 0.8);
-        border: 1px solid #333333;
-        padding: 15px;
+        background: rgba(10, 10, 10, 0.95);
+        border: 1px solid #2d3748;
+        border-radius: 8px;
+        padding: 16px;
         font-size: 12px;
-        max-width: 250px;
+        max-width: 280px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        backdrop-filter: blur(10px);
       }}
       .hud .title {{
-        font-weight: bold;
-        margin-bottom: 10px;
-        color: #00ffff;
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: #ffffff;
+        font-size: 14px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
       }}
       .hud .stats {{
-        margin-bottom: 10px;
-        color: #cccccc;
+        margin-bottom: 12px;
+        color: #a0aec0;
+        font-size: 11px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #2d3748;
+      }}
+      .hud .legend {{
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #2d3748;
+      }}
+      .hud .legend-title {{
+        font-size: 11px;
+        font-weight: 600;
+        color: #e2e8f0;
+        margin-bottom: 8px;
       }}
       .hud .info {{
         color: #ffffff;
-        border-top: 1px solid #333333;
-        padding-top: 10px;
-        max-height: 150px;
+        font-size: 11px;
+        line-height: 1.5;
+        max-height: 120px;
         overflow: auto;
+      }}
+      .hud .info::-webkit-scrollbar {{
+        width: 4px;
+      }}
+      .hud .info::-webkit-scrollbar-thumb {{
+        background: #4a5568;
+        border-radius: 2px;
       }}
     </style>
 
     <div class="hud">
-      <div class="title">TITAN MEMORY</div>
+      <div class="title">Titan Memory</div>
       <div class="stats">
-        {facts_count} facts · {sim_count} connections
+        {facts_count} memories · {sim_count} connections
       </div>
-      <div class="info" id="nodeInfo">Click node to inspect</div>
+      <div class="legend">
+        <div class="legend-title">Knowledge Areas</div>
+        {legend_items}
+      </div>
+      <div class="legend">
+        <div class="legend-title">Connection Strength</div>
+        {edge_legend}
+      </div>
+      <div class="info" id="nodeInfo">Click a node to view details</div>
     </div>
     """
 
     # Insert HUD right after <body>
     html = html.replace("<body>", "<body>" + hud)
 
-    # Hook click events to show node text
+    # Hook click events to show node text with better formatting
     marker = "var network = new vis.Network(container, data, options);"
     if marker in html:
         html = html.replace(
             marker,
             marker + """
             var infoEl = document.getElementById("nodeInfo");
+            var nodeEl = document.querySelector(".hud .info");
+            
             network.on("click", function(params) {
-              if (!params.nodes || params.nodes.length === 0) return;
+              if (!params.nodes || params.nodes.length === 0) {
+                infoEl.textContent = "Click a node to view details";
+                return;
+              }
+              
               var id = params.nodes[0];
               var node = data.nodes.get(id);
               if (!node) return;
-              infoEl.textContent = node.title || node.label || id;
+              
+              // Format node info
+              var text = node.title || node.label || id;
+              var label = node.label || "Node";
+              
+              infoEl.innerHTML = "<strong>" + label + "</strong><br/><br/>" + 
+                text.replace(/\\n/g, "<br/>");
+            });
+            
+            // Hover effect
+            network.on("hoverNode", function(params) {
+              document.body.style.cursor = "pointer";
+            });
+            
+            network.on("blurNode", function(params) {
+              document.body.style.cursor = "default";
             });
             """
         )
 
     # Save artifacts
-    artifacts = {"model": MODEL, "facts": HARDCODED_FACTS, "embedding_dim": emb_dim}
+    artifacts = {"model": MODEL, "facts": facts, "embedding_dim": emb_dim}
     (out_dir / "artifacts.json").write_text(json.dumps(artifacts, indent=2), encoding="utf-8")
     (out_dir / "graph.html").write_text(html, encoding="utf-8")
 

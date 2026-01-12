@@ -62,6 +62,26 @@ def graph() -> FileResponse:
     return FileResponse(GRAPH_FILE)
 
 
+@router.get("/api/graph/status")
+def graph_status() -> dict:
+    """Get graph status and last modification time for dynamic updates"""
+    if not GRAPH_FILE.exists():
+        return {"exists": False, "mtime": None, "memory_count": 0}
+
+    import os
+    mtime = os.path.getmtime(GRAPH_FILE)
+
+    # Get memory count for display
+    from storage.memories import get_memory_count
+    count = get_memory_count()
+
+    return {
+        "exists": True,
+        "mtime": mtime,
+        "memory_count": count
+    }
+
+
 @router.get("/api/session")
 def create_session_route() -> dict:
     session = create_session()
