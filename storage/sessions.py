@@ -81,3 +81,9 @@ def add_message(session: Session, role: str, content: str, turn: int, ts: Option
     message = Message(role=role, content=content, ts=timestamp, turn=turn)
     session.messages.append(message)
     save_session(session)
+
+
+def clear_all_sessions() -> None:
+    ensure_dirs()
+    for session_file in SESSIONS_DIR.glob("*.json"):
+        session_file.unlink()

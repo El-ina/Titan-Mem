@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 
 from storage.models import ChatRequest
-from storage.sessions import create_session, load_session, ensure_dirs
+from storage.sessions import create_session, load_session, ensure_dirs, clear_all_sessions
 from storage.memories import get_recent_memories, get_memory_count
 from chat.conversation import send_chat_message
 from extraction.extractor import extract_atomic_memories
@@ -109,5 +109,6 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> dict:
 def clear_memories_route() -> dict:
     ensure_dirs()
     clear_all_memories()
+    clear_all_sessions()
     build_graph()
     return {"status": "cleared"}
