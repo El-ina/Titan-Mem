@@ -338,14 +338,34 @@
       });
 
       document.getElementById("clearMemories").addEventListener("click", async () => {
-        if (!confirm("Are you sure you want to clear all memories? This cannot be undone.")) {
+        if (!confirm("Are you sure you want to clear all memories, sessions, and chat history? This cannot be undone.")) {
           return;
         }
+        
+        // Call the clear API
         const res = await fetch("/api/clear-memories", {
           method: "POST"
         });
+        
         if (res.ok) {
-          await refreshMemories();
+          // Clear the UI chat messages
+          messagesEl.innerHTML = "";
+          
+          // Clear the memory list
+          memoryListEl.innerHTML = "";
+          memoryCountEl.textContent = "0";
+          memoryCount = 0;
+          memoryStatusEl.textContent = "idle";
+          
+          // Create a new session and store it
+          localStorage.removeItem("titan_session_id");
+          sessionId = null;
+          await ensureSession();
+          
+          // Show success message
+          addMessage("assistant", "All memories and chat history cleared. Starting fresh!");
+        } else {
+          alert("Failed to clear memories. Please try again.");
         }
       });
 

@@ -27,31 +27,7 @@ def build_graph(sim_top_k: int = 2, sim_min: float = 0.35) -> None:
     all_memories = load_memories()
 
     if not all_memories:
-        net = Network(height="700px", width="100%", directed=False)
-        net.show_buttons(filter_=["physics"])
-
-        html = net.generate_html()
-
-        lines = html.split('\n')
-        new_lines = []
-        for line in lines:
-            if '"enabled": false' in line:
-                new_lines.append(line.replace('false', 'true'))
-                new_lines.append('        "filter": ["physics"],')
-            else:
-                new_lines.append(line)
-
-        GRAPH_FILE.write_text('\n'.join(new_lines), encoding="utf-8")
-
-        artifacts = {
-            "model": "auto",
-            "facts": [],
-            "embedding_dim": 0,
-            "memory_count": 0,
-        }
-
-        with open(ARTIFACTS_FILE, "w", encoding="utf-8") as f:
-            json.dump(artifacts, f, indent=2)
+        # Don't create empty graph - just return
         return
 
     facts = [m["text"] for m in all_memories]
@@ -60,6 +36,7 @@ def build_graph(sim_top_k: int = 2, sim_min: float = 0.35) -> None:
 
     graph = nx.Graph()
 
+    # Group memories by session
     session_docs = {}
     for mem in all_memories:
         sid = mem["session_id"]
@@ -70,6 +47,7 @@ def build_graph(sim_top_k: int = 2, sim_min: float = 0.35) -> None:
             label = f"S {sid[:6]}"
             graph.add_node(doc_id, label=label, title=f"Session {sid}", kind="document")
 
+    # Add memory nodes
     for idx, mem in enumerate(all_memories):
         mem_id = mem["id"]
         graph.add_node(
@@ -79,33 +57,32 @@ def build_graph(sim_top_k: int = 2, sim_min: float = 0.35) -> None:
             kind="memory",
             session_id=mem["session_id"],
         )
+        # Connect memory to its session
         graph.add_edge(session_docs[mem["session_id"]], mem_id, weight=1.0, kind="source")
 
+    # Add similarity edges between memories
     for a, b, w in edges:
         graph.add_edge(all_memories[a]["id"], all_memories[b]["id"], weight=w, kind="similarity")
 
+    # Create pyvis network with physics controls
     net = Network(height="700px", width="100%", directed=False)
-    net.show_buttons(filter_=["physics"])
+    
+    # Enable physics configuration UI
+    net.show_buttons(filter_=['physics'])
+    
     net.from_nx(graph)
 
+    # Style similarity edges
     for edge in net.edges:
         if edge.get("kind") == "similarity":
             edge["title"] = f"cosine_sim={edge.get('weight', 0):.3f}"
             edge["value"] = max(1.0, 10.0 * float(edge.get("weight", 0)))
 
+    # Generate and save HTML
     html = net.generate_html()
+    GRAPH_FILE.write_text(html, encoding="utf-8")
 
-    lines = html.split('\n')
-    new_lines = []
-    for line in lines:
-        if '"enabled": false' in line:
-            new_lines.append(line.replace('false', 'true'))
-            new_lines.append('        "filter": ["physics"],')
-        else:
-            new_lines.append(line)
-
-    GRAPH_FILE.write_text('\n'.join(new_lines), encoding="utf-8")
-
+    # Save artifacts
     artifacts = {
         "model": "auto",
         "facts": facts,

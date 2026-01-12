@@ -1,11 +1,12 @@
 from pathlib import Path
 from typing import Optional
+import shutil
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 
 from storage.models import ChatRequest
-from storage.sessions import create_session, load_session, ensure_dirs, clear_all_sessions
+from storage.sessions import create_session, load_session, ensure_dirs
 from storage.memories import get_recent_memories, get_memory_count
 from chat.conversation import send_chat_message
 from extraction.extractor import extract_atomic_memories
@@ -14,13 +15,14 @@ from storage.memories import (
     create_memory_record,
     load_all_memories,
     save_all_memories,
-    clear_all_memories,
 )
 from knowledge_graph.builder import build_graph
 from storage.sessions import OUT_DIR
 
 
 GRAPH_FILE = OUT_DIR / "graph.html"
+MEMORIES_FILE = OUT_DIR / "memories.json"
+SESSIONS_DIR = OUT_DIR / "sessions"
 
 
 def run_memory_pipeline(session_id: str, turn: int, user_text: str, assistant_text: str) -> None:
@@ -56,7 +58,7 @@ def index() -> HTMLResponse:
 @router.get("/graph")
 def graph() -> FileResponse:
     if not GRAPH_FILE.exists():
-        raise HTTPException(status_code=404, detail="Graph not generated yet.")
+        raise HTTPException(status_code=404, detail="Graph not generated yet. Start chatting to create memories!")
     return FileResponse(GRAPH_FILE)
 
 
@@ -106,9 +108,30 @@ def chat(req: ChatRequest, background_tasks: BackgroundTasks) -> dict:
 
 
 @router.post("/api/clear-memories")
-def clear_memories_route() -> dict:
+def clear_memories() -> dict:
+    """Clear all memories, sessions, and graphs"""
     ensure_dirs()
-    clear_all_memories()
-    clear_all_sessions()
-    build_graph()
-    return {"status": "cleared"}
+    
+    # Clear the memories file
+    if MEMORIES_FILE.exists():
+        MEMORIES_FILE.write_text("[]", encoding="utf-8")
+    
+    # Remove the graph file
+    if GRAPH_FILE.exists():
+        GRAPH_FILE.unlink()
+    
+    # Clear all session files
+    if SESSIONS_DIR.exists():
+        # Remove all .json files in sessions directory
+        for session_file in SESSIONS_DIR.glob("*.json"):
+            session_file.unlink()
+    
+    # Also clear artifacts if it exists
+    artifacts_file = OUT_DIR / "artifacts.json"
+    if artifacts_file.exists():
+        artifacts_file.unlink()
+    
+    return {
+        "status": "success", 
+        "message": "All memories, sessions, and graphs cleared"
+    }

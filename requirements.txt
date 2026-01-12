@@ -1,8 +1,15 @@
-fastapi
-uvicorn[standard]
-pydantic
-numpy
-pyyaml
-networkx
-pyvis
-requests
+# Core dependencies
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+
+# Graph and visualization
+networkx==3.2.1
+pyvis==0.3.2
+
+# Data processing
+numpy==1.26.2
+requests==2.31.0
+
+# Configuration
+pyyaml==6.0.1
