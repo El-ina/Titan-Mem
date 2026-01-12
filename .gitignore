@@ -19,5 +19,11 @@ server.log
 .DS_Store
 Thumbs.db
 
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
 # Backup files (optional - keeping locally but not on GitHub)
 # *_old.py
